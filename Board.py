@@ -1,89 +1,95 @@
 class Board():
 	def __init__(self):
-		self.dim = {"height": 1, "width": 1}
-		self.offset = {
-			"x": 0, "y": 0,
-			"q": 0, "r": 0
-		}
-		self.tiles = [[None]]
-		self[self.offset["q"],self.offset["r"]] = "*"
+		self.height = 1
+		self.width = 1
+		self._tiles_xy = [[None]]
+		self._origin_rs = self.AxialCoordinate(0,0) #self.XYCoordinate(0,0).to_axial()
+		self._origin_xy = self.XYCoordinate(0,0)
 	
-	def __getitem__(self, qr):
-		x, y = self.axial_to_xy(qr)
-		if (
-			x < 0 or x >= self.dim["width"] or
-			y < 0 or y >= self.dim["height"]
-			):
-			raise IndexError
-		return self.tiles[y][x]
+	def __getitem__(self, rs: Board.AxialCoordinate):
+		xy = self._rs_to__true_xy(rs)
+		return self._tiles_xy[xy.y][xy.x]
 
-	def __setitem__(self, qr, value):
-		x, y = self.axial_to_xy(qr)
-		if x < 0:
-			for i in range(-x):
-				self.offset["x"] -= 1
-				for j in range(self.dim["height"]):
-					self.tiles[j].insert(0,None)
-				self.dim["width"] += 1
-		if y < 0:
-			for j in range(-y):
-				self.offset["y"] -= 1
-				self.tiles.insert(0, [None for i in range(self.dim["width"])])
-				self.dim["height"] += 1
-		if x >= self.dim["width"]:
-			for i in range(x - self.dim["width"] + 1):
-				for j in range(self.dim["height"]):
-					self.tiles[j].append(None)
-				self.dim["width"] += 1
-		if y >= self.dim["height"]:
-			for j in range(y - self.dim["height"] + 1):
-				self.tiles.append([None for i in range(self.dim["width"])])
-				self.dim["height"] += 1
-		x, y = self.axial_to_xy(qr)
-		self.tiles[y][x] = value
+	def __setitem__(self, rs: Board.AxialCoordinate, value):
+		xy = self._rs_to__true_xy(rs)
+		self._expand_tiles(xy)
+		xy = self._rs_to__true_xy(rs)
+		self._tiles_xy[xy.y][xy.x] = value
+	
+	def _rs_to__true_xy(self, rs):
+		return (rs + self._origin_rs).to_xy() + self._origin_xy
 
-	def axial_to_xy(self, qr):
-		q, r = qr
-		q -= self.offset["q"]
-		r -= self.offset["r"]
-		parity = q&1
-		col = q - self.offset["x"]
-		row = r + (q - parity) // 2 - self.offset["y"]
-		return (col, row)
-
-	def xy_to_axial(self, xy):
-		x, y = xy
-		x -= self.offset["x"]
-		y -= self.offset["y"]
-		parity = x&1
-		q = x - self.offset["q"]
-		r = y - (x - parity) // 2 - self.offset["r"]
-		return (q, r)
+	def _expand_tiles(self, xy: Board.XYCoordinate):
+		if xy.x < 0:
+			self.width -= xy.x
+			self._origin_xy.x -= xy.x
+			for j in range(self.height):
+				self._tiles_xy[j].insert(0, None)
+		if xy.x >= self.width:
+			self.width += xy.x - self.width + 1
+			for j in range(self.height):
+				self._tiles_xy[j].append(None)
+		if xy.y < 0:
+			self.height -= xy.y
+			self._origin_xy.y -= xy.y
+			self._tiles_xy.insert(0, [None for i in range(self.width)])
+		if xy.y >= self.height:
+			self.height += xy.y - self.height + 1
+			self._tiles_xy.append([None for i in range(self.width)])
 	
 	def __str__(self):
-		return "\n".join(map(lambda row: " ".join([f"{str(tile):5}" for tile in row]), self.tiles))
-	
-	def hexes_str(self):
-		hex_width = 9
-		spacing = " " * hex_width
-		rows = []
-		for y in range(self.dim["height"] * 2):
-			rows.append([])
-			parity = y&1
-			true_y = y // 2
-			if parity: rows[-1].append("")
-			for x in range(1 if parity else 0, self.dim["width"], 2):
-				# tile_rep = str(self.tiles[true_y][x])
-				q, r = self.xy_to_axial((x, true_y))
-				tile_rep = f"{q:^2}/{r:^2}/{-q-r:^2}"
-				rows[-1].append(f"{tile_rep:>{hex_width}}")
-			if parity: rows[-1].append("")
+		content_width = 6
+		return "\n".join([
+			" " * ((content_width//2 + 1) * (j%2)) + "  ".join([
+				f"{str(self._tiles_xy[j//2][i]):^{content_width}}" for i in range(j&1, self.width, 2)
+			]) for j in range(-1, -self.height*2 - 1, -1)
+		])
 
-		return "\n".join([spacing.join(row) for row in rows])
-	
+	class AxialCoordinate():
+		def __init__(self, r, s):
+			self.r = r
+			self.s = s
+		
+		def to_xy(self):
+			x = self.r - self.s
+			y = self.s + x // 2
+			return Board.XYCoordinate(x, y)
+		
+		def __add__(self, other: Board.AxialCoordinate):
+			return Board.AxialCoordinate(self.r + other.r, self.s + other.s)
+		
+		def __str__(self):
+			return f"<{self.r},{self.s}>"
+
+	class XYCoordinate():
+		def __init__(self, x, y):
+			self.x = x
+			self.y = y
+		
+		def to_axial(self):
+			s = self.y - self.x // 2
+			r = s + self.x
+			return Board.AxialCoordinate(r, s)
+		
+		def __add__(self, other: Board.XYCoordinate):
+			return Board.XYCoordinate(self.x + other.x, self.y + other.y)
+		
+		def __str__(self):
+			return f"({self.x},{self.y})"
+
 if __name__ == "__main__":
 	my_board = Board()
-	for q in range(3):
-		for r in range(3):
-			my_board[q, r] = True
-	print(my_board.hexes_str())
+	my_board[Board.AxialCoordinate(0,0)] = "A1"
+	my_board[Board.AxialCoordinate(1,0)] = "B1"
+	my_board[Board.AxialCoordinate(1,1)] = "B2"
+	my_board[Board.AxialCoordinate(0,1)] = "A2"
+	my_board[Board.AxialCoordinate(2,0)] = "C1"
+	my_board[Board.AxialCoordinate(2,1)] = "C2"
+	my_board[Board.AxialCoordinate(2,2)] = "C3"
+	my_board[Board.AxialCoordinate(1,2)] = "B3"
+	my_board[Board.AxialCoordinate(0,2)] = "A3"
+	print(my_board)
+	# for q in range(3):
+	# 	for r in range(3):
+	# 		my_board[q, r] = True
+	# print(my_board.hexes_str())
