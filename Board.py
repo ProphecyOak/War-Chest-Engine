@@ -1,8 +1,10 @@
 class Board():
+	DEFAULT_VALUE = ""
+
 	def __init__(self):
 		self.height = 1
 		self.width = 1
-		self._tiles_xy = [[None]]
+		self._tiles_xy = [[Board.DEFAULT_VALUE]]
 		self._origin_rs = self.AxialCoordinate(0,0) #self.XYCoordinate(0,0).to_axial()
 		self._origin_xy = self.XYCoordinate(0,0)
 	
@@ -21,24 +23,26 @@ class Board():
 
 	def _expand_tiles(self, xy: Board.XYCoordinate):
 		if xy.x < 0:
+			xy.x -= xy.x&1
 			self.width -= xy.x
 			self._origin_xy.x -= xy.x
 			for j in range(self.height):
-				self._tiles_xy[j].insert(0, None)
+				for i in range(-xy.x):
+					self._tiles_xy[j].insert(0, Board.DEFAULT_VALUE)
 		if xy.x >= self.width:
 			self.width += xy.x - self.width + 1
 			for j in range(self.height):
-				self._tiles_xy[j].append(None)
+				self._tiles_xy[j].append(Board.DEFAULT_VALUE)
 		if xy.y < 0:
 			self.height -= xy.y
 			self._origin_xy.y -= xy.y
-			self._tiles_xy.insert(0, [None for i in range(self.width)])
+			self._tiles_xy.insert(0, [Board.DEFAULT_VALUE for i in range(self.width)])
 		if xy.y >= self.height:
 			self.height += xy.y - self.height + 1
-			self._tiles_xy.append([None for i in range(self.width)])
+			self._tiles_xy.append([Board.DEFAULT_VALUE for i in range(self.width)])
 	
 	def __str__(self):
-		content_width = 6
+		content_width = 8
 		return "\n".join([
 			" " * ((content_width//2 + 1) * (j%2)) + "  ".join([
 				f"{str(self._tiles_xy[j//2][i]):^{content_width}}" for i in range(j&1, self.width, 2)
@@ -79,16 +83,14 @@ class Board():
 
 if __name__ == "__main__":
 	my_board = Board()
-	my_board[Board.AxialCoordinate(0,0)] = "A1"
-	my_board[Board.AxialCoordinate(1,0)] = "B1"
-	my_board[Board.AxialCoordinate(1,1)] = "B2"
-	my_board[Board.AxialCoordinate(0,1)] = "A2"
-	my_board[Board.AxialCoordinate(2,0)] = "C1"
-	my_board[Board.AxialCoordinate(2,1)] = "C2"
-	my_board[Board.AxialCoordinate(2,2)] = "C3"
-	my_board[Board.AxialCoordinate(1,2)] = "B3"
-	my_board[Board.AxialCoordinate(0,2)] = "A3"
+	for r in range(7):
+		for s in range(7):
+			rs = Board.AxialCoordinate(r,s)
+			xy = rs.to_xy()
+			if xy.x < -3 or xy.x > 3: continue
+			my_board[rs] = f"{"ABCDEFGHIJK"[r]}{s}"
 	print(my_board)
+	print()
 	# for q in range(3):
 	# 	for r in range(3):
 	# 		my_board[q, r] = True
