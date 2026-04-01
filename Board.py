@@ -1,7 +1,10 @@
+from Model import Coin_Collection, COIN
+
 class Board():
 	DEFAULT_VALUE = ""
 
-	def __init__(self):
+	def __init__(self, rep_func = str):
+		self.rep_func = rep_func
 		self.height = 1
 		self.width = 1
 		self._tiles_xy = [[Board.DEFAULT_VALUE]]
@@ -45,7 +48,7 @@ class Board():
 		content_width = 8
 		return "\n".join([
 			" " * ((content_width//2 + 1) * (j%2)) + "  ".join([
-				f"{str(self._tiles_xy[j//2][i]):^{content_width}}" for i in range(j&1, self.width, 2)
+				f"{self.rep_func(self._tiles_xy[j//2][i]):^{content_width}}" for i in range(j&1, self.width, 2)
 			]) for j in range(-1, -self.height*2 - 1, -1)
 		])
 
@@ -81,17 +84,32 @@ class Board():
 		def __str__(self):
 			return f"({self.x},{self.y})"
 
+class Tile():
+	def __init__(self):
+		self.controllable = False
+		self.coins = Coin_Collection()
+
+	def __str__(self):
+			if self.coins.size() == 0:
+					return "⬣"
+			else:
+				return f"{self.coins.peek()[:2]}-{str(self.coins.size())}"
+
+def make_board(layout = 0):
+	match layout:
+		case 0:
+			board = Board()
+			for r in range(7):
+				for s in range(7):
+					rs = Board.AxialCoordinate(r,s)
+					xy = rs.to_xy()
+					if xy.x < -3 or xy.x > 3: continue
+					board[rs] = Tile()
+			return board
+
 if __name__ == "__main__":
-	my_board = Board()
-	for r in range(7):
-		for s in range(7):
-			rs = Board.AxialCoordinate(r,s)
-			xy = rs.to_xy()
-			if xy.x < -3 or xy.x > 3: continue
-			my_board[rs] = f"{"ABCDEFGHIJK"[r]}{s}"
+	my_board = make_board()
+	my_board[Board.AxialCoordinate(1,0)].coins.add_coin(COIN.PIKEMAN)
+	my_board[Board.AxialCoordinate(1,0)].coins.add_coin(COIN.PIKEMAN)
+	my_board[Board.AxialCoordinate(0,2)].coins.add_coin(COIN.SWORDSMAN)
 	print(my_board)
-	print()
-	# for q in range(3):
-	# 	for r in range(3):
-	# 		my_board[q, r] = True
-	# print(my_board.hexes_str())

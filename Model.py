@@ -2,6 +2,7 @@ from random import choice
 
 class COIN():
     PIKEMAN = "pikeman"
+    SWORDSMAN = "swordsman"
 
 class Coin_Collection():
     def __init__(self, max_size_: int = -1):
@@ -26,6 +27,13 @@ class Coin_Collection():
         if not replacement:
             self._coins.remove(returned_coin)
         return returned_coin
+    
+    def peek(self):
+        return self._coins[-1]
+    
+    def size(self):
+        return len(self._coins)
+        
     
 #####################################
 ## EXCEPTIONS
