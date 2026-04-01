@@ -87,13 +87,20 @@ class Board():
 class Tile():
 	def __init__(self):
 		self.controllable = False
+		self.allegiance = -1
 		self.coins = Coin_Collection()
+	
+	def setup(self, controllable = False, allegiance = -1):
+		self.controllable = controllable
+		self.allegiance = allegiance
 
 	def __str__(self):
+			def red(s):
+				return f"\x1b[31m{s}\x1b[0m"
 			if self.coins.size() == 0:
-					return "⬣"
+					return red("⬣")
 			else:
-				return f"{self.coins.peek()[:2]}-{str(self.coins.size())}"
+				return f"\x1b[m{self.coins.peek()[:2]}-{str(self.coins.size())}\x1b[0m"
 
 def make_board(layout = 0):
 	match layout:
@@ -105,6 +112,20 @@ def make_board(layout = 0):
 					xy = rs.to_xy()
 					if xy.x < -3 or xy.x > 3: continue
 					board[rs] = Tile()
+
+			control_spots = [
+				(0,2,0),
+				(1,0,0),
+				(4,6,1),
+				(6,5,1),
+				(2,2)
+			]
+			for spot in control_spots:
+				rs = Board.AxialCoordinate(spot[0], spot[1])
+				board[rs].setup(True, *spot[2:])
+			board[Board.AxialCoordinate(0, 2)].setup(True, 0)
+			board[Board.AxialCoordinate(1, 0)].setup(True, 0)
+			board[Board.AxialCoordinate(1, 3)].setup(True)
 			return board
 
 if __name__ == "__main__":
