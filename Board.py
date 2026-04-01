@@ -1,7 +1,8 @@
 from Model import Coin_Collection, COIN
 
 class Board():
-	DEFAULT_VALUE = ""
+	HEX_WIDTH = 8
+	DEFAULT_VALUE = f"{'':^{HEX_WIDTH}}"
 
 	def __init__(self, rep_func = str):
 		self.rep_func = rep_func
@@ -45,10 +46,9 @@ class Board():
 			self._tiles_xy.append([Board.DEFAULT_VALUE for i in range(self.width)])
 	
 	def __str__(self):
-		content_width = 8
 		return "\n".join([
-			" " * ((content_width//2 + 1) * (j%2)) + "  ".join([
-				f"{self.rep_func(self._tiles_xy[j//2][i]):^{content_width}}" for i in range(j&1, self.width, 2)
+			" " * ((Board.HEX_WIDTH//2 + 1) * (j%2)) + "  ".join([
+				f"{self.rep_func(self._tiles_xy[j//2][i])}" for i in range(j&1, self.width, 2)
 			]) for j in range(-1, -self.height*2 - 1, -1)
 		])
 
@@ -95,12 +95,21 @@ class Tile():
 		self.allegiance = allegiance
 
 	def __str__(self):
-			def red(s):
-				return f"\x1b[31m{s}\x1b[0m"
+			colors = [
+				lambda s: f"\x1b[31m{s}\x1b[0m",
+				lambda s: f"\x1b[32m{s}\x1b[0m",
+				lambda s: f"\x1b[34m{s}\x1b[0m",
+			]
 			if self.coins.size() == 0:
-					return red("⬣")
+				hex = f"{"⬣":^{Board.HEX_WIDTH}}"
+				if self.controllable: return colors[self.allegiance](hex)
+				return hex
 			else:
-				return f"\x1b[m{self.coins.peek()[:2]}-{str(self.coins.size())}\x1b[0m"
+				stack = f"{self.coins.peek()[:2]}-{str(self.coins.size())}"
+				label = f"{stack:^{Board.HEX_WIDTH}}"
+				if self.controllable:
+					return colors[self.allegiance](label)
+				return label
 
 def make_board(layout = 0):
 	match layout:
@@ -112,20 +121,15 @@ def make_board(layout = 0):
 					xy = rs.to_xy()
 					if xy.x < -3 or xy.x > 3: continue
 					board[rs] = Tile()
-
 			control_spots = [
-				(0,2,0),
-				(1,0,0),
-				(4,6,1),
-				(6,5,1),
-				(2,2)
+				(0,2,0), (1,0,0),
+				(5,6,1), (6,4,1),
+				(2,3), (1,4), (3,5),
+				(3,1), (4,3), (5,2)
 			]
 			for spot in control_spots:
 				rs = Board.AxialCoordinate(spot[0], spot[1])
 				board[rs].setup(True, *spot[2:])
-			board[Board.AxialCoordinate(0, 2)].setup(True, 0)
-			board[Board.AxialCoordinate(1, 0)].setup(True, 0)
-			board[Board.AxialCoordinate(1, 3)].setup(True)
 			return board
 
 if __name__ == "__main__":
