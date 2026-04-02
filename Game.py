@@ -17,17 +17,13 @@ class Game():
 		self.stack.append(lambda: self.set_running(False))
 		for x in range(3):
 			for player in range(self.player_count):
-				self.stack.append(
-					(
-						lambda p: lambda: print(p)
-					)
-					((-(player+1) + self.initiative) % self.player_count)
-				)
+				p = (-(player+1) + self.initiative) % self.player_count
+				self.stack.append((lambda p: lambda: print(p))(p))
 
 	def run(self):
 		self.running = True
+		print(self.board)
 		while self.running:
-			print(self.board)
 			if len(self.stack) == 0:
 				self.setup_round()
 			self.stack.pop()()

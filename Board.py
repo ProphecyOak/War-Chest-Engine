@@ -9,7 +9,7 @@ class Board():
 		self.height = 1
 		self.width = 1
 		self._tiles_xy = [[Board.DEFAULT_VALUE]]
-		self._origin_rs = self.AxialCoordinate(0,0) #self.XYCoordinate(0,0).to_axial()
+		self._origin_rs = self.AxialCoordinate(1,0) #self.XYCoordinate(0,0).to_axial()
 		self._origin_xy = self.XYCoordinate(0,0)
 	
 	def __getitem__(self, rs: Board.AxialCoordinate):
@@ -45,6 +45,11 @@ class Board():
 			self.height += xy.y - self.height + 1
 			self._tiles_xy.append([Board.DEFAULT_VALUE for i in range(self.width)])
 	
+	def string_to_axial(self, address: str):
+		s = "ABCDEFGHIJ".index(address[0])
+		r = int(address[1:])
+		return Board.AxialCoordinate(r, s) - self._origin_rs
+	
 	def __str__(self):
 		return "\n".join([
 			" " * ((Board.HEX_WIDTH//2 + 1) * (j%2)) + "  ".join([
@@ -64,6 +69,9 @@ class Board():
 		
 		def __add__(self, other: Board.AxialCoordinate):
 			return Board.AxialCoordinate(self.r + other.r, self.s + other.s)
+		
+		def __sub__(self, other: Board.AxialCoordinate):
+			return Board.AxialCoordinate(self.r - other.r, self.s - other.s)
 		
 		def __str__(self):
 			return f"<{self.r},{self.s}>"
@@ -94,6 +102,9 @@ class Tile():
 		self.controllable = controllable
 		self.allegiance = allegiance
 
+	def controlled_by(self, player):
+		self.allegiance = player
+
 	def __str__(self):
 			colors = [
 				lambda s: f"\x1b[31m{s}\x1b[0m",
@@ -121,6 +132,7 @@ def make_board(layout = 0):
 					xy = rs.to_xy()
 					if xy.x < -3 or xy.x > 3: continue
 					board[rs] = Tile()
+
 			control_spots = [
 				(0,2,0), (1,0,0),
 				(5,6,1), (6,4,1),
@@ -130,11 +142,24 @@ def make_board(layout = 0):
 			for spot in control_spots:
 				rs = Board.AxialCoordinate(spot[0], spot[1])
 				board[rs].setup(True, *spot[2:])
+
+			s = -1
+			for r in range(7):
+				board[Board.AxialCoordinate(r,s)] = f"{r + board._origin_rs.r:^{Board.HEX_WIDTH}}"
+				if r > 2: s += 1
+
+			r = -1
+			for s in range(7):
+				board[Board.AxialCoordinate(r,s)] = f"{"ABCDEFGHIJ"[s + board._origin_rs.s]:^{Board.HEX_WIDTH}}"
+				if s > 2: r += 1
+
 			return board
 
 if __name__ == "__main__":
 	my_board = make_board()
-	my_board[Board.AxialCoordinate(1,0)].coins.add_coin(COIN.PIKEMAN)
-	my_board[Board.AxialCoordinate(1,0)].coins.add_coin(COIN.PIKEMAN)
-	my_board[Board.AxialCoordinate(0,2)].coins.add_coin(COIN.SWORDSMAN)
+	for x in range(2): my_board[my_board.string_to_axial("C1")].coins.add_coin(COIN.PIKEMAN)
+	my_board[my_board.string_to_axial("B4")].coins.add_coin(COIN.SWORDSMAN)
 	print(my_board)
+	print()
+	for coin in my_board[my_board.string_to_axial("C1")].coins:
+		print(coin)

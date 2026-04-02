@@ -31,6 +31,17 @@ class Coin_Collection():
     def peek(self):
         return self._coins[-1]
     
+    def __iter__(self):
+        self._iteration_n = 0
+        return self
+    
+    def __next__(self):
+        i = self._iteration_n
+        self._iteration_n += 1
+        if i >= len(self._coins):
+            raise StopIteration
+        return self._coins[i]
+    
     def size(self):
         return len(self._coins)
         
