@@ -14,12 +14,12 @@ class Game():
 		self.initiative = 0
 		self.board = make_board()
 		self.running = False
+		self.round = 1
 	
 	def set_running(self, value):
 		self.running = value
 
 	def setup_round(self):
-		self.stack.append(lambda: self.set_running(False))
 		for x in range(3):
 			for player in range(self.player_count):
 				p = (-(player+1) + self.initiative) % self.player_count
@@ -29,12 +29,15 @@ class Game():
 
 	def run(self):
 		self.running = True
+		self.setup_round()
 		while self.running:
 			Game.reset_printing()
+			Game.print(f"Round: {self.round}")
 			Game.print(self.board)
 			Game.print()
 			if len(self.stack) == 0:
 				self.setup_round()
+				self.round += 1
 			self.stack.pop()()
 	
 	def print(s=""):
