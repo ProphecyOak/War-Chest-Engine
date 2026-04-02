@@ -143,14 +143,17 @@ def make_board(layout = 0):
 				rs = Board.AxialCoordinate(spot[0], spot[1])
 				board[rs].setup(True, *spot[2:])
 
+			def yellow(s):
+				return f"\x1b[1;33m{s}\x1b[0m"
+
 			s = -1
 			for r in range(7):
-				board[Board.AxialCoordinate(r,s)] = f"{r + board._origin_rs.r:^{Board.HEX_WIDTH}}"
+				board[Board.AxialCoordinate(r,s)] = yellow(f"{r + board._origin_rs.r:^{Board.HEX_WIDTH}}")
 				if r > 2: s += 1
 
 			r = -1
 			for s in range(7):
-				board[Board.AxialCoordinate(r,s)] = f"{"ABCDEFGHIJ"[s + board._origin_rs.s]:^{Board.HEX_WIDTH}}"
+				board[Board.AxialCoordinate(r,s)] = yellow(f"{"ABCDEFGHIJ"[s + board._origin_rs.s]:^{Board.HEX_WIDTH}}")
 				if s > 2: r += 1
 
 			return board

@@ -1,6 +1,7 @@
 from random import choice
 
 class COIN():
+    ROYAL_COIN = "royal coin"
     PIKEMAN = "pikeman"
     SWORDSMAN = "swordsman"
 
@@ -44,6 +45,11 @@ class Coin_Collection():
     
     def size(self):
         return len(self._coins)
+    
+    def transfer_to(self, other):
+        for coin in self:
+            other.add_coin(coin)
+        self._coins.clear()
         
     
 #####################################
