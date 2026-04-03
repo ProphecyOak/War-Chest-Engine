@@ -89,29 +89,29 @@ class Player():
 				self.discard_pile.transfer_to(self.bag)
 			self.hand.add_coin(self.bag.draw_coin())
 	
-	def highlighted_hand(self, selected_coin=""):
+	def highlighted_hand(self, selected_coin=None):
 		hand = f"You have: {", ".join([coin for coin in self.hand])}"
-		if selected_coin == "": return hand
+		if not selected_coin: return hand
 		return hand.replace(selected_coin, f"\x1b[46m{selected_coin}\x1b[0m")
 	
 	def turn(self):
 		Screen.print(f"It's your turn, player {self.name}")
 		Screen.push_print_section() # FOR SHOWING HAND
-		Screen.print(self.highlighted_hand())
-		Screen.push_print_section() # FOR CHOOSING A COIN
 		chosen_coin = None
-		while not chosen_coin:
-			Screen.print("Please select a coin:")
-			coin_input = Screen.input("> ")
+		while True:
+			Screen.print(self.highlighted_hand(chosen_coin))
+			chosen_coin = None
+			Screen.push_print_section() # FOR CHOOSING A COIN
+			while not chosen_coin:
+				Screen.print("Please select a coin:")
+				coin_input = Screen.input("> ")
+				Screen.reset_printing()
+				if coin_input in self.hand:
+					chosen_coin = coin_input
+					Screen.pop_print_section() # DONE CHOOSING COIN
+					break
 			Screen.reset_printing()
-			if coin_input in self.hand:
-				chosen_coin = coin_input
-				Screen.pop_print_section() # DONE CHOOSING COIN
-				break
-		Screen.reset_printing()
-		Screen.print(self.highlighted_hand(chosen_coin))
-
-		Screen.input("You chose wisely...")
+			
 
 if __name__ == "__main__":
 	my_game = Game()
