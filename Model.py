@@ -42,6 +42,9 @@ class Coin_Collection():
         if i >= len(self._coins):
             raise StopIteration
         return self._coins[i]
+
+    def __contains__(self, item):
+        return item in self._coins
     
     def size(self):
         return len(self._coins)
