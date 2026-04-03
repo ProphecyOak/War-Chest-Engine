@@ -1,5 +1,5 @@
 from Model import Coin_Collection, COIN
-from Board import make_board
+from Board import make_board, Tile
 
 LINE_UP = "\033[1A"
 LINE_CLEAR = "\x1b[2K"
@@ -65,6 +65,15 @@ class Screen():
 		Screen.lines_printed[-1] += s.count("\n") + 1
 		return input(s)
 	
+	def await_input(s="", validator=lambda x: True):
+		Screen.push_print_section()
+		while True:
+			value = Screen.input(s)
+			Screen.reset_printing()
+			if validator(value):
+				Screen.pop_print_section()
+				return value
+	
 	def reset_printing():
 		for x in range(Screen.lines_printed[-1]):
 			print(LINE_UP,end=LINE_CLEAR)
@@ -95,23 +104,38 @@ class Player():
 		return hand.replace(selected_coin, f"\x1b[46m{selected_coin}\x1b[0m")
 	
 	def turn(self):
+		board = self.game.board
+
+		def universal_input(s):
+			if s == "quit": quit()
+			return s in ["back"]
+		def universal_or(f):
+			return lambda x: universal_input(x) or f(x)
+		def valid_coin(coin): return coin in self.hand
+		def valid_space(space):
+			if len(space) < 2: return False
+			try:
+				return type(board[board.string_to_axial(space)]) == Tile
+			except ValueError:
+				return False
+
 		Screen.print(f"It's your turn, player {self.name}")
 		Screen.push_print_section() # FOR SHOWING HAND
 		chosen_coin = None
+		chosen_space = None
 		while True:
 			Screen.print(self.highlighted_hand(chosen_coin))
-			chosen_coin = None
-			Screen.push_print_section() # FOR CHOOSING A COIN
-			while not chosen_coin:
-				Screen.print("Please select a coin:")
-				coin_input = Screen.input("> ")
-				Screen.reset_printing()
-				if coin_input in self.hand:
-					chosen_coin = coin_input
-					Screen.pop_print_section() # DONE CHOOSING COIN
-					break
+			if not chosen_coin:
+				chosen_coin = Screen.await_input("Please choose a coin:\n> ", universal_or(valid_coin))
+				if chosen_coin == "back":
+					chosen_coin = None
+			elif not chosen_space:
+				chosen_space = Screen.await_input("Please select a space:\n> ", universal_or(valid_space))
+				if chosen_space == "back":
+					chosen_coin = None
+					chosen_space = None
 			Screen.reset_printing()
-			
+
 
 if __name__ == "__main__":
 	my_game = Game()
