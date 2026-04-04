@@ -112,31 +112,57 @@ class Player():
 		def universal_or(f):
 			return lambda x: universal_input(x) or f(x)
 		def valid_coin(coin): return coin in self.hand
-		def valid_space(space):
-			if len(space) < 2: return False
-			try:
-				return type(board[board.string_to_axial(space)]) == Tile
-			except ValueError:
-				return False
+		actions = [
+			"pass", "recruit", "initiative",
+			"deploy", "bolster",
+			"move", "attack", "control", "tactic"
+		]
+		def valid_action(action): return (action in actions) or (action in range(0,len(actions)))
 
 		Screen.print(f"It's your turn, player {self.name}")
 		Screen.push_print_section() # FOR SHOWING HAND
 		chosen_coin = None
-		chosen_space = None
-		while True:
+		chosen_action = None
+		turn_over = False
+		while not turn_over:
 			Screen.print(self.highlighted_hand(chosen_coin))
 			if not chosen_coin:
 				chosen_coin = Screen.await_input("Please choose a coin:\n> ", universal_or(valid_coin))
 				if chosen_coin == "back":
 					chosen_coin = None
-			elif not chosen_space:
-				chosen_space = Screen.await_input("Please select a space:\n> ", universal_or(valid_space))
-				if chosen_space == "back":
+			elif not chosen_action:
+				chosen_action = Screen.await_input("Please choose an action:\n", universal_or(valid_action))
+				if chosen_action == "back":
 					chosen_coin = None
-					chosen_space = None
+					chosen_action = None
+			else:
+				self.hand.remove_coin(chosen_coin)
+				self.discard_pile.add_coin(chosen_coin)
+				match chosen_action:
+					case "pass" | 0:
+						pass
+					case "recruit" | 1:
+						pass
+					case "initative" | 2:
+						pass
+					case "deploy" | 3:
+						pass
+					case "bolster" | 4:
+						pass
+					case "move" | 5:
+						pass
+					case "attack" | 6:
+						pass
+					case "control" | 7:
+						pass
+					case "tactic" | 8:
+						pass
+				turn_over = True
+			
 			Screen.reset_printing()
 
 
 if __name__ == "__main__":
+	print()
 	my_game = Game()
 	my_game.run()
