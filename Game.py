@@ -37,7 +37,7 @@ class Game():
 				self.round += 1
 			Screen.pop_print_section(True)
 			Screen.reset_printing()
-			Screen.print(f"Round: {self.round}           Initiative: {self.initiative}")
+			Screen.print(f"Round: {self.round}{" "*30}Initiative: {self.initiative}")
 			Screen.print(self.board)
 			Screen.print()
 			Screen.push_print_section()
