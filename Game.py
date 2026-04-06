@@ -12,6 +12,12 @@ class Game():
 		self.players = [Player(self, p) for p in range(self.player_count)]
 		self.initiative = 0
 		self.board = make_board()
+		self.team_count = 2
+		self.teams = [Team(n) for n in range(self.team_count)]
+		self.teams[0].control_spots = [(0,2,0), (1,0,0)]
+		self.teams[1].control_spots = [(5,6,1), (6,4,1)]
+		for x in range(self.player_count):
+			self.teams[x % self.team_count].add_player(self.players[x])
 		self.running = False
 		self.round = 1
 	
@@ -81,6 +87,21 @@ class Screen():
 			print(LINE_UP,end=LINE_CLEAR)
 		Screen.lines_printed[-1] = 0
 
+class Team():
+	def __init__(self, id):
+		self.id = id
+		self.control_spots = []
+		self.players = []
+
+	def add_player(self, player):
+		if player.team: player.team.remove_player(player)
+		self.players.append(player)
+		player.team = self
+	
+	def remove_player(self, player):
+		self.players.remove(player)
+		player.team = None
+
 class Player():
 	def __init__(self, game, n):
 		self.game = game
@@ -93,6 +114,7 @@ class Player():
 		self.supply = Coin_Collection()
 		self.eliminated = Coin_Collection()
 		self.id = n
+		self.team = None
 		self.taken_initiative = False
 	
 	def draw_up(self):
@@ -112,6 +134,8 @@ class Player():
 		# "deploy", "bolster", "move", "attack", "control", "tactic"
 		if self.supply.size() > 0: actions.append("recruit")
 		if self.game.initiative != self.id and not self.taken_initiative: actions.append("initiative")
+		for spot_coords in self.team.control_spots:
+			pass
 		return actions
 	
 	def turn(self):
@@ -157,17 +181,17 @@ class Player():
 				if chosen_action == "back":
 					chosen_coin = None
 					chosen_action = None
-				if chosen_action not in actions: chosen_action = actions[int(chosen_action) - 1]
+				elif chosen_action not in actions: chosen_action = actions[int(chosen_action) - 1]
 
 			else:
 				self.hand.remove_coin(chosen_coin)
-				self.discard_pile.add_coin(chosen_coin)
 				match chosen_action:
 					case "pass" | 0:
-						pass
+						self.discard_pile.add_coin(chosen_coin, False)
 					case "recruit" | 1:
-						pass
+						self.discard_pile.add_coin(chosen_coin, False)
 					case "initiative" | 2:
+						self.discard_pile.add_coin(chosen_coin, False)
 						self.claim_initiative()
 					case "deploy" | 3:
 						pass

@@ -8,16 +8,20 @@ class COIN():
 class Coin_Collection():
     def __init__(self, max_size_: int = -1):
         self._coins = []
+        self._faceup = []
         self._max_size = max_size_
     
-    def add_coin(self, coin: str):
+    def add_coin(self, coin: str, faceup = False):
         if self._max_size == len(self._coins):
             raise FullCollectionError
         self._coins.append(coin)
+        self._faceup.append(faceup)
     
     def remove_coin(self, coin: str):
         try:
-            self._coins.remove(coin)
+            idx = self._coins.index(coin)
+            del self._coins[idx]
+            del self._faceup[idx]
         except ValueError:
             raise CoinError
     
@@ -26,7 +30,7 @@ class Coin_Collection():
             raise EmptyCollectionError
         returned_coin = choice(self._coins)
         if not replacement:
-            self._coins.remove(returned_coin)
+            self.remove_coin(returned_coin)
         return returned_coin
     
     def peek(self):
