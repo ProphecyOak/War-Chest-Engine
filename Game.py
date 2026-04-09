@@ -1,6 +1,6 @@
 from Model import Coin_Collection, COIN
 from Board import make_board, Tile
-from Unit import Unit
+from Unit import UNITS
 
 LINE_UP = "\033[1A"
 LINE_CLEAR = "\x1b[2K"
@@ -68,7 +68,7 @@ class Screen():
 		Screen.lines_printed[-1] += to_print.count("\n") + 1
 
 	def input(s=""):
-		to_print = str(s)
+		to_print = str(s) + "\n> "
 		Screen.lines_printed[-1] += to_print.count("\n") + 1
 		return input(to_print).lower()
 
@@ -115,7 +115,7 @@ class Team():
 class Player():
 	def __init__(self, game, n):
 		self.game = game
-		self.units = {x: Unit(x, self) for x in [COIN.PIKEMAN, COIN.SWORDSMAN]}
+		self.units = {x: UNITS[x](self) for x in [COIN.PIKEMAN, COIN.SWORDSMAN]}
 		self.hand = Coin_Collection(3)
 		self.bag = Coin_Collection()
 		self.bag.add_coin(COIN.ROYAL_COIN)
@@ -159,7 +159,7 @@ class Player():
 			self.game.stack.append(Screen.pop_print_section)
 		else:
 			Screen.print(f"Player {self.id}, try again")
-		Screen.await_input("Ready? (y/yes)\n> ", lambda x: x.lower() in ["y", "yes"])
+		Screen.await_input("Ready? (y/yes)", lambda x: x.lower() in ["y", "yes"])
 		self.game.stack.append(self.choose_coin)
 	
 	def restart_turn(self):
@@ -169,7 +169,7 @@ class Player():
 		Screen.print(self.highlighted_hand())
 
 		def valid_coin(coin): return coin in self.hand
-		chosen_coin = Screen.await_input("Please choose a coin:\n> ", valid_coin)
+		chosen_coin = Screen.await_input("Please choose a coin:", valid_coin)
 		if chosen_coin == "back":
 			self.restart_turn()
 			return
@@ -178,25 +178,24 @@ class Player():
 	def choose_action(self, coin):
 		Screen.print(self.highlighted_hand(coin))
 
-		def valid_action(actions):
-			def action_in_list(action):
-				try:
-					action_idx = int(action) - 1
-					if action_idx in range(0, len(actions)): return True
-				except:
-					return action in actions
-				return False
-			return action_in_list
-		
 		actions = self.elligible_actions(coin)
+		def valid_action(action):
+			try:
+				action_idx = int(action) - 1
+				if action_idx in range(0, len(actions)): return True
+			except:
+				return action in actions
+			return False
+		
 		chosen_action = Screen.await_input(
-			f"Please choose an action:\nOptions: {", ".join(actions)}\n",
-			valid_action(actions)
+			f"Please choose an action:\nOptions: {", ".join(actions)}",
+			valid_action
 		)
 		if chosen_action == "back":
 			self.restart_turn()
 			return
 		if chosen_action not in actions: chosen_action = actions[int(chosen_action) - 1]
+
 		match chosen_action:
 			case "pass":
 				self.discard_coin(self.hand, coin)
@@ -205,8 +204,9 @@ class Player():
 				self.claim_initiative()
 			case "recruit":
 				self.game.stack.append(lambda: self.choose_recruit(coin))
-			# case "deploy":
-			# 	pass
+			case "deploy":
+				open_spots = self.units[coin].deployable_spots()
+				self.game.stack.append(lambda: self.choose_spot(coin, open_spots))
 			# case "bolster":
 			# 	pass
 			# case "move":
@@ -228,12 +228,34 @@ class Player():
 				recruitable.append(unit_name)
 
 		def valid_unit(unit): return unit in recruitable
-		chosen_coin = Screen.await_input("Please choose a unit to recruit:\n> ", valid_unit)
+		chosen_coin = Screen.await_input("Please choose a unit to recruit:", valid_unit)
 		if chosen_coin == "back":
 			self.restart_turn()
 			return
 		self.discard_coin(self.hand, coin_used)
 		self.discard_pile.add_coin(self.units[chosen_coin].supply.draw_coin(), True)
+	
+	def choose_spot(self, coin, elligible_spaces):
+		Screen.print(self.highlighted_hand(coin))
+
+		def valid_deploy(space):
+			try:
+				return self.game.board.string_to_axial(space) in elligible_spaces
+			except:
+				return False
+
+		chosen_space = Screen.await_input(
+			f"Please choose a space for deployment:",
+			valid_deploy
+		)
+		if chosen_space == "back":
+			self.restart_turn()
+			return
+		
+		self.hand.remove_coin(coin)
+		destination = self.game.board.string_to_axial(chosen_space)
+		self.game.board[destination].coins.add_coin(coin)
+		self.units[coin].on_board.append(destination)
 	
 	def claim_initiative(self):
 		self.game.initiative = self.id

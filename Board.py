@@ -46,7 +46,7 @@ class Board():
 			self._tiles_xy.append([Board.DEFAULT_VALUE for i in range(self.width)])
 	
 	def string_to_axial(self, address: str):
-		s = "ABCDEFGHIJ".index(address[0])
+		s = "ABCDEFGHIJ".index(address[0].upper())
 		r = int(address[1:])
 		return Board.AxialCoordinate(r, s) - self._origin_rs
 	
@@ -72,6 +72,9 @@ class Board():
 		
 		def __sub__(self, other: Board.AxialCoordinate):
 			return Board.AxialCoordinate(self.r - other.r, self.s - other.s)
+		
+		def __eq__(self, other):
+			return self.r == other.r and self.s == other.s
 		
 		def __str__(self):
 			return f"<{self.r},{self.s}>"

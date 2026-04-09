@@ -4,6 +4,7 @@ class COIN():
     ROYAL_COIN = "royal coin"
     PIKEMAN = "pikeman"
     SWORDSMAN = "swordsman"
+    SCOUT = "scout"
 
 class Coin_Collection():
     def __init__(self, max_size_: int = -1):
