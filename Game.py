@@ -1,5 +1,6 @@
 from Model import Coin_Collection, COIN
 from Board import make_board, Tile
+from Unit import Unit
 
 LINE_UP = "\033[1A"
 LINE_CLEAR = "\x1b[2K"
@@ -13,9 +14,9 @@ class Game():
 		self.initiative = 0
 		self.board = make_board()
 		self.team_count = 2
-		self.teams = [Team(n) for n in range(self.team_count)]
-		self.teams[0].control_spots = [(0,2,0), (1,0,0)]
-		self.teams[1].control_spots = [(5,6,1), (6,4,1)]
+		self.teams = [Team(n, self) for n in range(self.team_count)]
+		self.teams[0].control_spots = [self.board.AxialCoordinate(0,2), self.board.AxialCoordinate(1,0)]
+		self.teams[1].control_spots = [self.board.AxialCoordinate(5,6), self.board.AxialCoordinate(6,4)]
 		for x in range(self.player_count):
 			self.teams[x % self.team_count].add_player(self.players[x])
 		self.running = False
@@ -88,8 +89,9 @@ class Screen():
 		Screen.lines_printed[-1] = 0
 
 class Team():
-	def __init__(self, id):
+	def __init__(self, id, game):
 		self.id = id
+		self.game = game
 		self.control_spots = []
 		self.players = []
 
@@ -102,16 +104,22 @@ class Team():
 		self.players.remove(player)
 		player.team = None
 
+	def empty_controlled_spots(self):
+		options = []
+		for x in self.control_spots:
+			if self.game.board[x].empty(): options.append(x)
+		return options
+
 class Player():
 	def __init__(self, game, n):
 		self.game = game
+		self.units = {x: Unit(x, self) for x in [COIN.PIKEMAN, COIN.SWORDSMAN]}
 		self.hand = Coin_Collection(3)
 		self.bag = Coin_Collection()
 		self.bag.add_coin(COIN.ROYAL_COIN)
-		self.bag.add_coin(COIN.PIKEMAN)
-		self.bag.add_coin(COIN.SWORDSMAN)
+		for unit in self.units.values():
+			for x in range(2): self.bag.add_coin(unit.supply.draw_coin())
 		self.discard_pile = Coin_Collection()
-		self.supply = Coin_Collection()
 		self.eliminated = Coin_Collection()
 		self.id = n
 		self.team = None
@@ -127,15 +135,17 @@ class Player():
 	def highlighted_hand(self, selected_coin=None):
 		hand = f"You have: {", ".join([coin for coin in self.hand])}"
 		if not selected_coin: return hand
-		return hand.replace(selected_coin, f"\x1b[46m{selected_coin}\x1b[0m")
+		return hand.replace(selected_coin, f"\x1b[46m{selected_coin}\x1b[0m", 1)
 	
 	def elligible_actions(self, coin):
 		actions = ["pass"]
-		# "deploy", "bolster", "move", "attack", "control", "tactic"
-		if self.supply.size() > 0: actions.append("recruit")
+		# "bolster", "move", "attack", "control", "tactic"
+		for unit in self.units.values():
+			if unit.can_recruit():
+				actions.append("recruit")
+				break
 		if self.game.initiative != self.id and not self.taken_initiative: actions.append("initiative")
-		for spot_coords in self.team.control_spots:
-			pass
+		if self.units[coin].can_deploy(): actions.append("deploy")
 		return actions
 	
 	def turn(self):

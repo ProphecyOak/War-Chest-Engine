@@ -105,6 +105,9 @@ class Tile():
 	def controlled_by(self, player):
 		self.allegiance = player
 
+	def empty(self):
+		return self.coins.size() == 0
+
 	def __str__(self):
 			colors = [
 				lambda s: f"\x1b[31m{s}\x1b[0m",
