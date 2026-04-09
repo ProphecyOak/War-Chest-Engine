@@ -36,19 +36,17 @@ class Game():
 
 	def run(self):
 		Screen.print("\n"*25)
+		Screen.reset_printing()
 		self.running = True
 		self.setup_round()
 		while self.running:
 			if len(self.stack) == 0:
 				self.setup_round()
 				self.round += 1
-			Screen.pop_print_section(True)
-			Screen.reset_printing()
-			Screen.print(f"Round: {self.round}{" "*30}Initiative: {self.initiative}")
-			Screen.print(self.board)
-			Screen.print()
 			Screen.push_print_section()
 			self.stack.pop()()
+			Screen.reset_printing()
+			Screen.pop_print_section()
 
 class Screen():	
 	lines_printed = [0]
@@ -73,13 +71,17 @@ class Screen():
 		to_print = str(s)
 		Screen.lines_printed[-1] += to_print.count("\n") + 1
 		return input(to_print).lower()
+
+	def universal_input(s):
+		if s == "quit": quit()
+		return s in ["back"]
 	
 	def await_input(s="", validator=lambda x: True):
 		Screen.push_print_section()
 		while True:
 			value = Screen.input(s)
 			Screen.reset_printing()
-			if validator(value):
+			if Screen.universal_input(value) or validator(value):
 				Screen.pop_print_section()
 				return value
 	
@@ -132,7 +134,7 @@ class Player():
 				self.discard_pile.transfer_to(self.bag)
 			self.hand.add_coin(self.bag.draw_coin())
 	
-	def highlighted_hand(self, selected_coin=None):
+	def highlighted_hand(self, selected_coin = None):
 		hand = f"You have: {", ".join([coin for coin in self.hand])}"
 		if not selected_coin: return hand
 		return hand.replace(selected_coin, f"\x1b[46m{selected_coin}\x1b[0m", 1)
@@ -145,18 +147,31 @@ class Player():
 				actions.append("recruit")
 				break
 		if self.game.initiative != self.id and not self.taken_initiative: actions.append("initiative")
+		if coin == COIN.ROYAL_COIN: return actions
 		if self.units[coin].can_deploy(): actions.append("deploy")
 		return actions
 	
 	def turn(self):
-		board = self.game.board
+		Screen.print(f"Round: {self.game.round}{" "*30}Initiative: {self.game.initiative}")
+		Screen.print(self.game.board)
+		Screen.print()
+		Screen.push_print_section()
+		self.game.stack.append(Screen.pop_print_section)
+		Screen.print(f"It's your turn, player {self.id}")
+		Screen.await_input("Ready? (y/yes)\n> ", lambda x: x.lower() in ["y", "yes"])
+		self.game.stack.append(self.choose_coin)
 
-		def universal_input(s):
-			if s == "quit": quit()
-			return s in ["back"]
-		def universal_or(f):
-			return lambda x: universal_input(x) or f(x)
+	def choose_coin(self):
+		Screen.print(self.highlighted_hand())
+
 		def valid_coin(coin): return coin in self.hand
+		chosen_coin = Screen.await_input("Please choose a coin:\n> ", valid_coin)
+		if chosen_coin == "back":
+			self.game.stack.append(self.turn)
+			return
+		self.game.stack.append(lambda: self.choose_action(chosen_coin))
+	
+	def choose_action(self, coin):
 		def valid_action(actions):
 			def action_in_list(action):
 				try:
@@ -166,58 +181,37 @@ class Player():
 					return action in actions
 				return False
 			return action_in_list
-
-		Screen.print(f"It's your turn, player {self.id}")
-		Screen.push_print_section() # FOR SHOWING HAND
-		chosen_coin = None
-		chosen_action = None
-		turn_over = False
-		while not turn_over:
-			Screen.print(self.highlighted_hand(chosen_coin))
-			if not chosen_coin:
-				chosen_coin = Screen.await_input(
-					"Please choose a coin:\n> ",
-					universal_or(valid_coin)
-				)
-				if chosen_coin == "back":
-					chosen_coin = None
-
-			elif not chosen_action:
-				actions = self.elligible_actions(chosen_coin)
-				chosen_action = Screen.await_input(
-					f"Please choose an action:\nOptions: {", ".join(actions)}\n",
-					universal_or(valid_action(actions))
-				)
-				if chosen_action == "back":
-					chosen_coin = None
-					chosen_action = None
-				elif chosen_action not in actions: chosen_action = actions[int(chosen_action) - 1]
-
-			else:
-				self.hand.remove_coin(chosen_coin)
-				match chosen_action:
-					case "pass" | 0:
-						self.discard_pile.add_coin(chosen_coin, False)
-					case "recruit" | 1:
-						self.discard_pile.add_coin(chosen_coin, False)
-					case "initiative" | 2:
-						self.discard_pile.add_coin(chosen_coin, False)
-						self.claim_initiative()
-					case "deploy" | 3:
-						pass
-					case "bolster" | 4:
-						pass
-					case "move" | 5:
-						pass
-					case "attack" | 6:
-						pass
-					case "control" | 7:
-						pass
-					case "tactic" | 8:
-						pass
-				turn_over = True
-			
-			Screen.reset_printing()
+		
+		actions = self.elligible_actions(coin)
+		chosen_action = Screen.await_input(
+			f"Please choose an action:\nOptions: {", ".join(actions)}\n",
+			valid_action(actions)
+		)
+		if chosen_action == "back":
+			self.game.stack.append(self.turn)
+			return
+		if chosen_action not in actions: chosen_action = actions[int(chosen_action) - 1]
+		self.hand.remove_coin(coin)
+		match chosen_action:
+			case "pass":
+				self.discard_pile.add_coin(coin, False)
+			# case "recruit" | 1:
+			# 	self.discard_pile.add_coin(coin, False)
+			case "initiative" | 2:
+				self.discard_pile.add_coin(coin, False)
+				self.claim_initiative()
+			# case "deploy" | 3:
+			# 	pass
+			# case "bolster" | 4:
+			# 	pass
+			# case "move" | 5:
+			# 	pass
+			# case "attack" | 6:
+			# 	pass
+			# case "control" | 7:
+			# 	pass
+			# case "tactic" | 8:
+			# 	pass
 	
 	def claim_initiative(self):
 		self.game.initiative = self.id
