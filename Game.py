@@ -10,7 +10,13 @@ class Game():
 	def __init__(self):
 		self.stack = []
 		self.player_count = 2
-		self.players = [Player(self, p) for p in range(self.player_count)]
+		units_dict = {x: UNITS[x] for x in [COIN.PIKEMAN, COIN.SCOUT]}
+		player_units = [{} for x in range(self.player_count)]
+		i = 0
+		for name, unit in units_dict.items():
+			player_units[i % self.player_count][name] = unit
+			i += 1
+		self.players = [Player(self, p, player_units[p]) for p in range(self.player_count)]
 		self.initiative = 0
 		self.board = make_board()
 		self.team_count = 2
@@ -144,9 +150,11 @@ def convert_chosen(player, options, chosen_option):
 	return chosen_option if chosen_option in options else options[int(chosen_option) - 1]
 
 class Player():
-	def __init__(self, game, n):
+	def __init__(self, game, n, units):
 		self.game = game
-		self.units = {x: UNITS[x](self) for x in [COIN.PIKEMAN, COIN.SCOUT]}
+		self.units = units
+		for name, unit in self.units.items():
+			self.units[name] = unit(self)
 		self.hand = Coin_Collection(3)
 		self.bag = Coin_Collection()
 		self.bag.add_coin(COIN.ROYAL_COIN)
@@ -184,6 +192,9 @@ class Player():
 			Screen.print(f"Player {self.id}, try again")
 		self.game.clear_selection()
 		Screen.await_input("Ready? (y/yes)", lambda x: x.lower() in ["y", "yes"])
+		if len(self.hand) == 0:
+			self.game.stack.append(lambda: Screen.input("Out of coins. Mandatory pass"))
+			return
 		self.game.stack.append(self.choose_action)
 		self.game.stack.append(lambda: self.choose_coin(self.hand))
 	
@@ -208,7 +219,7 @@ class Player():
 	
 	def elligible_actions(self, coin):
 		actions = ["pass"]
-		# "bolster", "move", "attack", "control", "tactic"
+		# "attack", "control", "tactic"
 		for unit in self.units.values():
 			if unit.can_recruit():
 				actions.append("recruit")
@@ -216,8 +227,9 @@ class Player():
 		if self.game.initiative != self.id and not self.taken_initiative: actions.append("initiative")
 		if coin == COIN.ROYAL_COIN: return actions
 		if self.units[coin].can_deploy(): actions.append("deploy")
-		if len(self.units[coin].on_board) > 0: actions.append("bolster")
+		if self.units[coin].can_bolster(): actions.append("bolster")
 		if self.units[coin].can_move(): actions.append("move")
+		if self.units[coin].can_attack(): actions.append("attack")
 		return actions
 	
 	def choose_action(self):
@@ -232,7 +244,9 @@ class Player():
 		)
 		chosen_action = convert_chosen(self, actions, chosen_action)
 		if not chosen_action: return
+		self.resolve_action(coin, chosen_action)
 
+	def resolve_action(self, coin, chosen_action):
 		# FACE DOWN DISCARDS
 		match chosen_action:
 			case "pass":
@@ -279,7 +293,7 @@ class Player():
 
 				self.game.stack.append(finish_deploy)
 				self.game.stack.append(lambda: self.choose_space(
-					self.units[coin].deployable_spots(),
+					self.game.board.map_to_string(self.units[coin].deployable_spots()),
 					purpose="to deploy to"
 				))
 				return
@@ -298,11 +312,16 @@ class Player():
 				return
 			
 		# FACE UP DISCARDS
+
+		if len(self.units[coin].on_board) > 1:
+			pass #TODO: Append choose unit stack based on unit functions
+			#		Think footman, but generalize for any number of stacks? (warship)
+
 		stack_idx = 0 #self.game.get_selection("stack_id")
 		match chosen_action:
 			case "move":
 				def finish_move():
-					self.discard_coin(self.hand, coin)
+					self.discard_coin(self.hand, coin, True)
 					destination = self.game.board.string_to_axial(self.game.get_selection("destination"))
 					original_coords = self.units[coin].on_board[stack_idx]
 					new_coords = self.game.board[destination]
@@ -311,14 +330,26 @@ class Player():
 
 				self.game.stack.append(finish_move)
 				self.game.stack.append(lambda: self.choose_space(
-					self.units[coin].empty_neighbors(),
+					self.game.board.map_to_string(self.units[coin].empty_neighbors()),
 					field="destination"
 				))
 				return
 
 			#TODO: Unit Attack
 			case "attack":
-				raise NotImplementedError
+				def finish_attack():
+					self.discard_coin(self.hand, coin, True)
+					target_tile = self.board[self.board.string_to_axial(self.game.get_selection("target"))]
+					target_unit = target_tile.peek()
+					target_tile.remove_coin(target_unit)
+
+				
+				self.game.stack.append(finish_attack)
+				self.game.stack.append(lambda: self.choose_space(
+					self.game.board.map_to_string(self.units[coin].attackable_neighbors(stack_idx)),
+					field="target"
+				))
+				return
 
 			#TODO: Unit Control
 			case "control":
@@ -327,10 +358,6 @@ class Player():
 			#TODO: Unit Tactic
 			case "tactic":
 				raise NotImplementedError
-			
-		if len(self.units[coin].on_board) > 1:
-			pass #TODO: Append choose unit stack based on unit functions
-			#		Think footman, but generalize for any number of stacks? (warship)
 	
 	def choose_space(self, options, field="space", purpose=""):
 		Screen.print(self.highlighted_hand())

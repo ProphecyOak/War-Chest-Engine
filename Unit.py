@@ -22,10 +22,17 @@ class Unit():
     
     def can_move(self, id=0):
         if len(self.on_board) <= id: return False
-        return len(self.empty_neighbors()) > 0
+        return len(list(self.empty_neighbors(id))) > 0
     
     def can_attack(self, id=0):
-        raise NotImplementedError
+        if len(self.on_board) <= id: return False
+        return len(list(self.occupied_neighbors(id))) > 0
+    
+    def was_attacked(self, id=0):
+        pass
+    
+    def attacked(self, id=0):
+        pass
     
     def can_control(self, id=0):
         raise NotImplementedError
@@ -34,15 +41,20 @@ class Unit():
         raise NotImplementedError
     
     def deployable_spots(self):
-        return self.map_axial_to_string(self.player.team.empty_controlled_spots())
+        return self.player.team.empty_controlled_spots()
     
     def empty_neighbors(self, id=0):
         board = self.player.game.board
         neighbors_of_stack = board.get_neighbors(self.on_board[id])
-        return self.map_axial_to_string(filter(lambda coord: board[coord].empty(), neighbors_of_stack))
+        return filter(lambda coord: board[coord].empty(), neighbors_of_stack)
     
-    def map_axial_to_string(self, spaces):
-        return list(map(lambda x: self.player.game.board.axial_to_string(x).lower(), spaces))
+    def occupied_neighbors(self, id=0):
+        board = self.player.game.board
+        neighbors_of_stack = board.get_neighbors(self.on_board[id])
+        return filter(lambda coord: not board[coord].empty(), neighbors_of_stack)
+    
+    def attackable_neighbors(self, id=0):
+        return filter(lambda neighbor: self.player.game.board[neighbor].player.team != self.player.team, self.occupied_neighbors(id))
 
 class Pikeman(Unit):
     def __init__(self, player):
@@ -62,7 +74,7 @@ class Scout(Unit):
             for unit in player.units.values():
                 for stack in unit.on_board:
                     spots.extend(self.player.game.board.get_neighbors(stack))
-        return self.map_axial_to_string(spots)
+        return spots
 
 UNITS = {
     COIN.PIKEMAN: Pikeman,

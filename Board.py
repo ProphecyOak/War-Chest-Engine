@@ -65,6 +65,9 @@ class Board():
 	def axial_to_string(self, rs: Board.AxialCoordinate):
 		shifted = rs + self._origin_rs
 		return f"{"ABCDEFGHIJ"[shifted.s]}{shifted.r}"
+
+	def map_to_string(self, spaces):
+		return list(map(lambda x: self.axial_to_string(x).lower(), spaces))
 	
 	def __str__(self):
 		return "\n".join([
