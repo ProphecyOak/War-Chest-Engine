@@ -23,6 +23,10 @@ class Game():
 		self.round = 1
 
 		self.selection = {}
+
+		#TODO: Add "undo-able" toggle for unrevertable obligations
+		#	Leverage this in the "Universal or" input checking
+		#	Use the "allow_backsies" parameter for "await_input"
 	
 	def get_selection(self, field):
 		return self.selection[field]
@@ -33,28 +37,25 @@ class Game():
 	def set_running(self, value):
 		self.running = value
 
-	def setup_round(self):
-		for x in range(3):
-			for player in range(self.player_count):
-				p = (-(player+1) + self.initiative) % self.player_count
-				self.stack.append(self.players[p].turn)
-		for player in self.players:
-			player.draw_up()
-			player.taken_initiative = self.initiative == player.id
-
 	def run(self):
 		Screen.print("\n"*25)
 		Screen.reset_printing()
 		self.running = True
-		self.setup_round()
 		while self.running:
-			if len(self.stack) == 0:
-				self.setup_round()
-				self.round += 1
-			Screen.push_print_section()
-			self.stack.pop()()
-			Screen.reset_printing()
-			Screen.pop_print_section()
+			for player in self.players:
+				player.draw_up()
+				player.taken_initiative = self.initiative == player.id
+			round_start = self.initiative
+			for x in range(3):
+				for i in range(self.player_count):
+					player_num = (i+round_start) % self.player_count
+					self.stack.append(self.players[player_num].turn)
+					while len(self.stack) > 0:
+						Screen.push_print_section()
+						self.stack.pop()()
+						Screen.reset_printing()
+						Screen.pop_print_section()
+			self.round += 1
 
 class Screen():	
 	lines_printed = [0]
@@ -82,16 +83,17 @@ class Screen():
 		Screen.lines_printed[-1] += to_print.count("\n") + 1
 		return input(to_print).lower()
 
-	def universal_input(s):
+	def universal_input(s, allow_backsies=True):
 		if s == "quit": quit()
+		if not allow_backsies: return False
 		return s in ["back"]
 	
-	def await_input(s="", validator=lambda x: True):
+	def await_input(s="", validator=lambda x: True, allow_backsies=True):
 		Screen.push_print_section()
 		while True:
 			value = Screen.input(s)
 			Screen.reset_printing()
-			if Screen.universal_input(value) or validator(value):
+			if Screen.universal_input(value, allow_backsies) or validator(value):
 				Screen.pop_print_section()
 				return value
 	
@@ -189,6 +191,7 @@ class Player():
 		self.game.stack.append(lambda: self.choose_coin(self.hand))
 	
 	def restart_turn(self):
+		self.game.stack.clear()
 		self.game.stack.append(lambda: self.turn(False))
 
 	def choose_coin(self, options, field="coin", purpose=""):
@@ -213,6 +216,7 @@ class Player():
 		if coin == COIN.ROYAL_COIN: return actions
 		if self.units[coin].can_deploy(): actions.append("deploy")
 		if len(self.units[coin].on_board) > 0: actions.append("bolster")
+		if self.units[coin].can_move(): actions.append("move")
 		return actions
 	
 	def choose_action(self):
@@ -228,13 +232,16 @@ class Player():
 		chosen_action = convert_chosen(self, actions, chosen_action)
 		if not chosen_action: return
 
+		# FACE DOWN DISCARDS
 		match chosen_action:
 			case "pass":
 				self.discard_coin(self.hand, coin)
+				return
 
 			case "initiative":
 				self.discard_coin(self.hand, coin)
 				self.claim_initiative()
+				return
 
 			case "recruit":
 				recruitable = []
@@ -256,7 +263,10 @@ class Player():
 					field="recruit",
 					purpose="to recruit"
 				))
-
+				return
+			
+		# DEPLOYMENT
+		match chosen_action:
 			case "deploy":
 				def finish_deploy():
 					self.hand.remove_coin(coin)
@@ -269,6 +279,7 @@ class Player():
 					self.units[coin].deployable_spots(),
 					purpose="to deploy to"
 				))
+				return
 
 			case "bolster":
 				def finish_bolster():
@@ -281,19 +292,42 @@ class Player():
 					self.units[coin].on_board,
 					purpose="to bolster"
 				))
+				return
+			
+		# FACE UP DISCARDS
+		stack_idx = 0 #self.game.get_selection("stack_id")
+		match chosen_action:
+			case "move":
+				def finish_move():
+					self.discard_coin(self.hand, coin)
+					destination = self.game.board.string_to_axial(self.game.get_selection("destination"))
+					original_coords = self.units[coin].on_board[stack_idx]
+					new_coords = self.game.board[destination]
+					self.game.board[original_coords].transfer_to(new_coords)
+					self.units[coin].on_board[stack_idx] = destination
 
-			#######TODO: Switch from game-stack to turn-stack. Clear turn-stack on restart-turn
-			# case "move":
-			# 	pass
+				self.game.stack.append(finish_move)
+				self.game.stack.append(lambda: self.choose_space(
+					self.units[coin].empty_neighbors(),
+					field="destination"
+				))
+				return
 
-			# case "attack":
-			# 	pass
+			#TODO: Unit Attack
+			case "attack":
+				raise NotImplementedError
 
-			# case "control":
-			# 	pass
+			#TODO: Unit Control
+			case "control":
+				raise NotImplementedError
 
-			# case "tactic":
-			# 	pass
+			#TODO: Unit Tactic
+			case "tactic":
+				raise NotImplementedError
+			
+		if len(self.units[coin].on_board) > 1:
+			pass #TODO: Append choose unit stack based on unit functions
+			#		Think footman, but generalize for any number of stacks? (warship)
 	
 	def choose_space(self, options, field="space", purpose=""):
 		Screen.print(self.highlighted_hand())

@@ -131,6 +131,9 @@ class Tile():
 
 	def empty(self):
 		return len(self.coins) == 0
+	
+	def transfer_to(self, other):
+		self.coins.transfer_to(other.coins)
 
 	def __str__(self):
 			colors = [

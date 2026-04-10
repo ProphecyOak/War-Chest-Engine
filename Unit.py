@@ -18,10 +18,11 @@ class Unit():
         return self.max_stacks > len(self.on_board) and len(self.deployable_spots()) > 0
     
     def can_bolster(self, id=0):
-        return len(self.on_board) > 0
+        return len(self.on_board) > id
     
     def can_move(self, id=0):
-        raise NotImplementedError
+        if len(self.on_board) <= id: return False
+        return len(self.empty_neighbors()) > 0
     
     def can_attack(self, id=0):
         raise NotImplementedError
@@ -34,6 +35,11 @@ class Unit():
     
     def deployable_spots(self):
         return self.player.team.empty_controlled_spots()
+    
+    def empty_neighbors(self, id=0):
+        board = self.player.game.board
+        neighbors_of_stack = board.get_neighbors(self.on_board[id])
+        return list(filter(lambda coord: board[coord].empty(), neighbors_of_stack))
 
 class Pikeman(Unit):
     def __init__(self, player):
