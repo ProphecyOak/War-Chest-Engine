@@ -146,7 +146,7 @@ def convert_chosen(player, options, chosen_option):
 class Player():
 	def __init__(self, game, n):
 		self.game = game
-		self.units = {x: UNITS[x](self) for x in [COIN.PIKEMAN]}
+		self.units = {x: UNITS[x](self) for x in [COIN.PIKEMAN, COIN.SCOUT]}
 		self.hand = Coin_Collection(3)
 		self.bag = Coin_Collection()
 		self.bag.add_coin(COIN.ROYAL_COIN)
@@ -334,6 +334,7 @@ class Player():
 	
 	def choose_space(self, options, field="space", purpose=""):
 		Screen.print(self.highlighted_hand())
+		# Screen.print(options)
 
 		chosen_space = Screen.await_input(
 			f"Please choose a space{" " * (purpose != "")}{purpose}:",

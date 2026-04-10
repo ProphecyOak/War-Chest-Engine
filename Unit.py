@@ -39,7 +39,7 @@ class Unit():
     def empty_neighbors(self, id=0):
         board = self.player.game.board
         neighbors_of_stack = board.get_neighbors(self.on_board[id])
-        return list(filter(lambda coord: board[coord].empty(), neighbors_of_stack))
+        return self.map_axial_to_string(filter(lambda coord: board[coord].empty(), neighbors_of_stack))
     
     def map_axial_to_string(self, spaces):
         return list(map(lambda x: self.player.game.board.axial_to_string(x).lower(), spaces))
