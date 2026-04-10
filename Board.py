@@ -4,7 +4,9 @@ class Board():
 	HEX_WIDTH = 8
 	DEFAULT_VALUE = f"{'':^{HEX_WIDTH}}"
 
-	def __init__(self, rep_func = str):
+	def __init__(self, rep_func = str, in_board=None):
+		if in_board: self.in_board = in_board
+		else: self.in_board = lambda rs: True 
 		self.rep_func = rep_func
 		self.height = 1
 		self.width = 1
@@ -21,6 +23,16 @@ class Board():
 		self._expand_tiles(xy)
 		xy = self._rs_to__true_xy(rs)
 		self._tiles_xy[xy.y][xy.x] = value
+
+	def get_neighbors(self, center: Board.AxialCoordinate, radius=1):
+		neighbors = []
+		for r in range(-radius, radius + 1):
+			for s in range(-radius + max(0, r), radius + 1 + min(0, r)):
+				if r == 0 and s == 0: continue
+				neighbor = Board.AxialCoordinate(r, s) + center
+				if self.in_board(neighbor):
+					neighbors.append(neighbor)
+		return neighbors
 	
 	def _rs_to__true_xy(self, rs):
 		return (rs + self._origin_rs).to_xy() + self._origin_xy
@@ -95,6 +107,15 @@ class Board():
 		def __str__(self):
 			return f"({self.x},{self.y})"
 
+DIRECTIONS = [
+	Board.AxialCoordinate(1,1),
+	Board.AxialCoordinate(1,0),
+	Board.AxialCoordinate(0,-1),
+	Board.AxialCoordinate(-1,-1),
+	Board.AxialCoordinate(-1,0),
+	Board.AxialCoordinate(0,1),
+]
+
 class Tile():
 	def __init__(self):
 		self.controllable = False
@@ -109,7 +130,7 @@ class Tile():
 		self.allegiance = player
 
 	def empty(self):
-		return self.coins.size() == 0
+		return len(self.coins) == 0
 
 	def __str__(self):
 			colors = [
@@ -117,12 +138,12 @@ class Tile():
 				lambda s: f"\x1b[32m{s}\x1b[0m",
 				lambda s: f"\x1b[34m{s}\x1b[0m",
 			]
-			if self.coins.size() == 0:
+			if len(self.coins) == 0:
 				hex = f"{"⬣":^{Board.HEX_WIDTH}}"
 				if self.controllable: return colors[self.allegiance](hex)
 				return hex
 			else:
-				stack = f"{self.coins.peek()[:2]}-{str(self.coins.size())}"
+				stack = f"{self.coins.peek()[:2]}-{str(len(self.coins))}"
 				label = f"{stack:^{Board.HEX_WIDTH}}"
 				if self.controllable:
 					return colors[self.allegiance](label)
@@ -131,7 +152,9 @@ class Tile():
 def make_board(layout = 0):
 	match layout:
 		case 0:
-			board = Board()
+			board = Board(in_board=lambda rs: (
+				rs.r in range(0,7) and rs.s in range(0,7) and (rs.r-rs.s) in range(-3,4)
+			))
 			for r in range(7):
 				for s in range(7):
 					rs = Board.AxialCoordinate(r,s)
@@ -166,9 +189,11 @@ def make_board(layout = 0):
 
 if __name__ == "__main__":
 	my_board = make_board()
-	for x in range(2): my_board[my_board.string_to_axial("C1")].coins.add_coin(COIN.PIKEMAN)
-	my_board[my_board.string_to_axial("B4")].coins.add_coin(COIN.SWORDSMAN)
+	# for x in range(2): my_board[my_board.string_to_axial("C1")].coins.add_coin(COIN.PIKEMAN)
+	# my_board[my_board.string_to_axial("B4")].coins.add_coin(COIN.SWORDSMAN)
+	for coord in my_board.get_neighbors(my_board.string_to_axial("A4"),2):
+		my_board[coord].coins.add_coin(COIN.SWORDSMAN)
 	print(my_board)
 	print()
-	for coin in my_board[my_board.string_to_axial("C1")].coins:
-		print(coin)
+	# for coin in my_board[my_board.string_to_axial("C1")].coins:
+	# 	print(coin)

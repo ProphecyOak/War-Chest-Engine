@@ -12,7 +12,7 @@ class Unit():
         self.on_board = []
 
     def can_recruit(self, id=0):
-        return self.supply.size() > 0
+        return len(self.supply) > 0
 
     def can_deploy(self):
         return self.max_stacks > len(self.on_board) and len(self.deployable_spots()) > 0
@@ -49,7 +49,10 @@ class Scout(Unit):
     
     def deployable_spots(self):
         spots = self.player.team.empty_controlled_spots()
-        ##  ADD NEIGHBOR OF ADJACENT HERE
+        for player in self.player.team.players:
+            for unit in player.units.values():
+                for stack in unit.on_board:
+                    spots.extend(self.player.game.board.get_neighbors(stack))
         return spots
 
 UNITS = {

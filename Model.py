@@ -37,6 +37,11 @@ class Coin_Collection():
     def peek(self):
         return self._coins[-1]
     
+    def transfer_to(self, other):
+        for coin in self:
+            other.add_coin(coin)
+        self._coins.clear()
+    
     def __iter__(self):
         self._iteration_n = 0
         return self
@@ -51,13 +56,11 @@ class Coin_Collection():
     def __contains__(self, item):
         return item in self._coins
     
-    def size(self):
+    def __len__(self):
         return len(self._coins)
     
-    def transfer_to(self, other):
-        for coin in self:
-            other.add_coin(coin)
-        self._coins.clear()
+    def __getitem__(self, idx):
+        return self._coins[idx]
         
     
 #####################################
