@@ -22,10 +22,13 @@ class Game():
 		self.running = False
 		self.round = 1
 
-		self.selection = {
-			"coin": None,
-			"spot": None
-		}
+		self.selection = {}
+	
+	def get_selection(self, field):
+		return self.selection[field]
+
+	def clear_selection(self):
+		self.selection = {}
 	
 	def set_running(self, value):
 		self.running = value
@@ -55,8 +58,10 @@ class Game():
 
 class Screen():	
 	lines_printed = [0]
+	extra_pushes = 0
 
-	def push_print_section():
+	def push_print_section(bonus=False):
+		if bonus: Screen.extra_pushes += 1
 		Screen.lines_printed.append(0)
 	
 	def pop_print_section(looping = False):
@@ -94,6 +99,12 @@ class Screen():
 		for x in range(Screen.lines_printed[-1]):
 			print(LINE_UP,end=LINE_CLEAR)
 		Screen.lines_printed[-1] = 0
+	
+	def clear_bonus():
+		while Screen.extra_pushes > 0:
+			Screen.reset_printing()
+			Screen.pop_print_section()
+			Screen.extra_pushes -= 1
 
 class Team():
 	def __init__(self, id, game):
@@ -154,12 +165,17 @@ class Player():
 				self.discard_pile.transfer_to(self.bag)
 			self.hand.add_coin(self.bag.draw_coin())
 	
-	def highlighted_hand(self, selected_coin = None):
-		hand = f"You have: {", ".join([coin for coin in self.hand])}"
+	def highlighted_hand(self):
+		if "coin" in self.game.selection.keys():
+			selected_coin = self.game.get_selection("coin")
+		else: selected_coin = None
+		hand = f"In Hand: {", ".join([coin for coin in self.hand])}"
 		if not selected_coin: return hand
 		return hand.replace(selected_coin, f"\x1b[46m{selected_coin}\x1b[0m", 1)
 	
 	def turn(self, first_try = True):
+		Screen.clear_bonus()
+		Screen.reset_printing()
 		if first_try:
 			Screen.print(f"Round: {self.game.round}{" "*30}Initiative: {self.game.initiative}")
 			Screen.print(f"{self.game.board}\n\nIt's your turn, player {self.id}")
@@ -167,23 +183,24 @@ class Player():
 			self.game.stack.append(Screen.pop_print_section)
 		else:
 			Screen.print(f"Player {self.id}, try again")
+		self.game.clear_selection()
 		Screen.await_input("Ready? (y/yes)", lambda x: x.lower() in ["y", "yes"])
-		self.game.stack.append(self.choose_coin)
+		self.game.stack.append(self.choose_action)
+		self.game.stack.append(lambda: self.choose_coin(self.hand))
 	
 	def restart_turn(self):
 		self.game.stack.append(lambda: self.turn(False))
 
-	def choose_coin(self):
+	def choose_coin(self, options, field="coin", purpose=""):
 		Screen.print(self.highlighted_hand())
 			
 		chosen_coin = Screen.await_input(
-			"Please choose a coin:",
-			valid_from_list(self.hand)
+			f"Please choose a coin{" " * (purpose != "")}{purpose}:",
+			valid_from_list(options)
 		)
-		chosen_coin = convert_chosen(self, self.hand, chosen_coin)
+		chosen_coin = convert_chosen(self, options, chosen_coin)
 		if not chosen_coin: return
-		self.game.selection["coin"] = chosen_coin
-		self.game.stack.append(lambda: self.choose_action())
+		self.game.selection[field] = chosen_coin
 	
 	def elligible_actions(self, coin):
 		actions = ["pass"]
@@ -199,8 +216,8 @@ class Player():
 		return actions
 	
 	def choose_action(self):
-		coin = self.game.selection["coin"]
-		Screen.print(self.highlighted_hand(coin))
+		coin = self.game.get_selection("coin")
+		Screen.print(self.highlighted_hand())
 
 		actions = self.elligible_actions(coin)
 		
@@ -214,58 +231,80 @@ class Player():
 		match chosen_action:
 			case "pass":
 				self.discard_coin(self.hand, coin)
+
 			case "initiative":
 				self.discard_coin(self.hand, coin)
 				self.claim_initiative()
+
 			case "recruit":
-				self.game.stack.append(lambda: self.choose_recruit())
+				recruitable = []
+				for unit_name, unit in self.units.items():
+					if unit.can_recruit():
+						recruitable.append(unit_name)
+
+				def finish_recruit():
+					chosen_recruit = self.game.get_selection("recruit")
+					self.discard_coin(self.hand, coin)
+					self.discard_pile.add_coin(self.units[chosen_recruit].supply.draw_coin(), True)
+
+				Screen.reset_printing()
+				Screen.print("Supply: " + ", ".join([f"{name}-{len(unit.supply)}" for name, unit in self.units.items()]))
+				Screen.push_print_section(bonus=True)
+				self.game.stack.append(finish_recruit)
+				self.game.stack.append(lambda: self.choose_coin(
+					recruitable,
+					field="recruit",
+					purpose="to recruit"
+				))
+
 			case "deploy":
-				open_spots = self.units[coin].deployable_spots()
-				self.game.stack.append(lambda: self.choose_deploy(coin, open_spots))
+				def finish_deploy():
+					self.hand.remove_coin(coin)
+					destination = self.game.board.string_to_axial(self.game.get_selection("space"))
+					self.game.board[destination].coins.add_coin(coin)
+					self.units[coin].on_board.append(destination)
+
+				self.game.stack.append(finish_deploy)
+				self.game.stack.append(lambda: self.choose_space(
+					self.units[coin].deployable_spots(),
+					purpose="to deploy to"
+				))
+
 			case "bolster":
-				pass
+				def finish_bolster():
+					self.hand.remove_coin(coin)
+					destination = self.game.board.string_to_axial(self.game.get_selection("space"))
+					self.game.board[destination].coins.add_coin(coin)
+
+				self.game.stack.append(finish_bolster)
+				self.game.stack.append(lambda: self.choose_space(
+					self.units[coin].on_board,
+					purpose="to bolster"
+				))
+
+			#######TODO: Switch from game-stack to turn-stack. Clear turn-stack on restart-turn
 			# case "move":
 			# 	pass
+
 			# case "attack":
 			# 	pass
+
 			# case "control":
 			# 	pass
+
 			# case "tactic":
 			# 	pass
-
-	def choose_recruit(self):
-		coin_used = self.game.selection["coin"]
-		Screen.print(self.highlighted_hand(coin_used))
-		Screen.print("Supply: " + ", ".join([f"{name}-{len(unit.supply)}" for name, unit in self.units.items()]))
-
-		recruitable = []
-		for unit_name, unit in self.units.items():
-			if unit.can_recruit():
-				recruitable.append(unit_name)
-
-		chosen_coin = Screen.await_input(
-			"Please choose a unit to recruit:",
-			valid_from_list(recruitable)
-		)
-		chosen_coin = convert_chosen(self, recruitable, chosen_coin)
-		if not chosen_coin: return
-
-		self.discard_coin(self.hand, coin_used)
-		self.discard_pile.add_coin(self.units[chosen_coin].supply.draw_coin(), True)
 	
-	def choose_deploy(self, coin, elligible_spaces):
-		Screen.print(self.highlighted_hand(coin))
+	def choose_space(self, options, field="space", purpose=""):
+		Screen.print(self.highlighted_hand())
 
 		chosen_space = Screen.await_input(
-			f"Please choose a space for deployment:",
-			lambda space: valid_from_list(elligible_spaces)(self.game.board.string_to_axial(space))
+			f"Please choose a space{" " * (purpose != "")}{purpose}:",
+			lambda space: valid_from_list(options)(self.game.board.string_to_axial(space))
 		)
 		if not chosen_space: return
-		
-		self.hand.remove_coin(coin)
-		destination = self.game.board.string_to_axial(chosen_space)
-		self.game.board[destination].coins.add_coin(coin)
-		self.units[coin].on_board.append(destination)
+
+		self.game.selection[field] = chosen_space
 
 	def claim_initiative(self):
 		self.game.initiative = self.id
