@@ -61,6 +61,10 @@ class Board():
 		s = "ABCDEFGHIJ".index(address[0].upper())
 		r = int(address[1:])
 		return Board.AxialCoordinate(r, s) - self._origin_rs
+
+	def axial_to_string(self, rs: Board.AxialCoordinate):
+		shifted = rs + self._origin_rs
+		return f"{"ABCDEFGHIJ"[shifted.s]}{shifted.r}"
 	
 	def __str__(self):
 		return "\n".join([
@@ -86,6 +90,7 @@ class Board():
 			return Board.AxialCoordinate(self.r - other.r, self.s - other.s)
 		
 		def __eq__(self, other):
+			if type(other) != Board.AxialCoordinate: return False
 			return self.r == other.r and self.s == other.s
 		
 		def __str__(self):

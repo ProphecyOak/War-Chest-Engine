@@ -48,21 +48,20 @@ class Game():
 			round_start = self.initiative
 			for x in range(3):
 				for i in range(self.player_count):
-					player_num = (i+round_start) % self.player_count
-					self.stack.append(self.players[player_num].turn)
+					player = self.players[(i+round_start) % self.player_count]
+					self.stack.append(player.turn)
+					Screen.push_print_section()
 					while len(self.stack) > 0:
-						Screen.push_print_section()
 						self.stack.pop()()
 						Screen.reset_printing()
-						Screen.pop_print_section()
+					Screen.pop_print_section()
 			self.round += 1
 
 class Screen():	
 	lines_printed = [0]
-	extra_pushes = 0
+	indenting = False
 
-	def push_print_section(bonus=False):
-		if bonus: Screen.extra_pushes += 1
+	def push_print_section():
 		Screen.lines_printed.append(0)
 	
 	def pop_print_section(looping = False):
@@ -72,14 +71,19 @@ class Screen():
 		Screen.lines_printed[-2] += Screen.lines_printed[-1]
 		Screen.lines_printed.pop()
 		if looping: Screen.pop_print_section(True)
+	
+	def indent(s):
+		if not Screen.indenting: return s
+		indentation = "|   " * (len(Screen.lines_printed) - 1)
+		return indentation + s.replace("\n", "\n" + indentation)
 
 	def print(s=""):
-		to_print = str(s)
+		to_print = Screen.indent(str(s))
 		print(to_print)
 		Screen.lines_printed[-1] += to_print.count("\n") + 1
 
 	def input(s=""):
-		to_print = str(s) + "\n> "
+		to_print = Screen.indent(str(s) + "\n> ")
 		Screen.lines_printed[-1] += to_print.count("\n") + 1
 		return input(to_print).lower()
 
@@ -101,12 +105,6 @@ class Screen():
 		for x in range(Screen.lines_printed[-1]):
 			print(LINE_UP,end=LINE_CLEAR)
 		Screen.lines_printed[-1] = 0
-	
-	def clear_bonus():
-		while Screen.extra_pushes > 0:
-			Screen.reset_printing()
-			Screen.pop_print_section()
-			Screen.extra_pushes -= 1
 
 class Team():
 	def __init__(self, id, game):
@@ -176,14 +174,13 @@ class Player():
 		return hand.replace(selected_coin, f"\x1b[46m{selected_coin}\x1b[0m", 1)
 	
 	def turn(self, first_try = True):
-		Screen.clear_bonus()
-		Screen.reset_printing()
 		if first_try:
 			Screen.print(f"Round: {self.game.round}{" "*30}Initiative: {self.game.initiative}")
 			Screen.print(f"{self.game.board}\n\nIt's your turn, player {self.id}")
 			Screen.push_print_section()
 			self.game.stack.append(Screen.pop_print_section)
 		else:
+			Screen.reset_printing()
 			Screen.print(f"Player {self.id}, try again")
 		self.game.clear_selection()
 		Screen.await_input("Ready? (y/yes)", lambda x: x.lower() in ["y", "yes"])
@@ -192,11 +189,15 @@ class Player():
 	
 	def restart_turn(self):
 		self.game.stack.clear()
+		self.game.stack.append(Screen.pop_print_section)
 		self.game.stack.append(lambda: self.turn(False))
 
-	def choose_coin(self, options, field="coin", purpose=""):
+	def choose_coin(self, options, field="coin", purpose="", **kwargs):
 		Screen.print(self.highlighted_hand())
-			
+		if "show_supply" in kwargs.keys() and kwargs["show_supply"]:
+			Screen.print("Supply: " + ", ".join(
+				[f"{name}-{len(unit.supply)}" for name, unit in self.units.items()]
+			))
 		chosen_coin = Screen.await_input(
 			f"Please choose a coin{" " * (purpose != "")}{purpose}:",
 			valid_from_list(options)
@@ -220,8 +221,8 @@ class Player():
 		return actions
 	
 	def choose_action(self):
-		coin = self.game.get_selection("coin")
 		Screen.print(self.highlighted_hand())
+		coin = self.game.get_selection("coin")
 
 		actions = self.elligible_actions(coin)
 		
@@ -240,7 +241,8 @@ class Player():
 
 			case "initiative":
 				self.discard_coin(self.hand, coin)
-				self.claim_initiative()
+				self.game.initiative = self.id
+				self.taken_initiative = True
 				return
 
 			case "recruit":
@@ -254,14 +256,15 @@ class Player():
 					self.discard_coin(self.hand, coin)
 					self.discard_pile.add_coin(self.units[chosen_recruit].supply.draw_coin(), True)
 
-				Screen.reset_printing()
+				# Screen.reset_printing()
 				Screen.print("Supply: " + ", ".join([f"{name}-{len(unit.supply)}" for name, unit in self.units.items()]))
-				Screen.push_print_section(bonus=True)
+				# Screen.push_print_section(bonus=True)
 				self.game.stack.append(finish_recruit)
 				self.game.stack.append(lambda: self.choose_coin(
 					recruitable,
 					field="recruit",
-					purpose="to recruit"
+					purpose="to recruit",
+					show_supply=True
 				))
 				return
 			
@@ -334,15 +337,12 @@ class Player():
 
 		chosen_space = Screen.await_input(
 			f"Please choose a space{" " * (purpose != "")}{purpose}:",
-			lambda space: valid_from_list(options)(self.game.board.string_to_axial(space))
+			valid_from_list(options)
 		)
+		chosen_space = convert_chosen(self, options, chosen_space)
 		if not chosen_space: return
 
 		self.game.selection[field] = chosen_space
-
-	def claim_initiative(self):
-		self.game.initiative = self.id
-		self.taken_initiative = True
 
 	def discard_coin(self, origin, coin, faceup = False):
 		origin.remove_coin(coin)

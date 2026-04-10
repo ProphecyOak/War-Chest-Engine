@@ -34,12 +34,15 @@ class Unit():
         raise NotImplementedError
     
     def deployable_spots(self):
-        return self.player.team.empty_controlled_spots()
+        return self.map_axial_to_string(self.player.team.empty_controlled_spots())
     
     def empty_neighbors(self, id=0):
         board = self.player.game.board
         neighbors_of_stack = board.get_neighbors(self.on_board[id])
         return list(filter(lambda coord: board[coord].empty(), neighbors_of_stack))
+    
+    def map_axial_to_string(self, spaces):
+        return list(map(lambda x: self.player.game.board.axial_to_string(x).lower(), spaces))
 
 class Pikeman(Unit):
     def __init__(self, player):
@@ -59,7 +62,7 @@ class Scout(Unit):
             for unit in player.units.values():
                 for stack in unit.on_board:
                     spots.extend(self.player.game.board.get_neighbors(stack))
-        return spots
+        return self.map_axial_to_string(spots)
 
 UNITS = {
     COIN.PIKEMAN: Pikeman,
